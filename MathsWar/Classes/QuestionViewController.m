@@ -1,0 +1,1049 @@
+//  MathsWar
+
+/*!
+ @class QuestionViewController
+ @superclass UIViewController
+ @abstract Shows question, score, coins, time and life.
+ 
+ @author Pradnya Mankar
+ @discussion Created: 16-01-2013
+ @updated 26-03-2013
+ */
+
+#import "QuestionViewController.h"
+#import "ScoreViewController.h"
+//#import "SA_OAuthTwitterEngine.h"
+//#import <Social/Social.h>
+#import "DDGameKitHelper.h"
+
+//#define kOAuthConsumerKey			@"3siK29apb1Kx7GZH6KabQ"
+//#define kOAuthConsumerSecret		@"Oou6vxVfPYeu7U2Tl3Dhxs8DpzMES2IhcJYZ0Rkqa0"
+
+@interface QuestionViewController ()
+
+@end
+
+@implementation QuestionViewController
+
+@synthesize lblQuestion, lblScore, lblCoins, lblTime, lblLife, lblResult, optionsView, bgImgView;
+@synthesize operand1, operand2, operand3, questionNumber, bonusQuestions, pitfallQuestion;
+@synthesize failedAttempts, timeInSec, game, prevSelection, prevQuestions;
+@synthesize life1, life2, life3, resultSmiley, question, options;
+
+- (id)initWithGameIndex:(NSInteger)_gameIndex
+{
+    self = [super init];
+    if (self) {
+        self.game = [[[MathsWarManager sharedManager] games] objectAtIndex:_gameIndex];
+    }
+    return self;
+}
+
+- (id)initWithGame:(NSMutableDictionary*)_game
+{
+    NSString *nibName;
+    int level = [[_game objectForKey:@"level"] intValue];
+    if( level == EASY ) {
+        nibName = @"QuestionViewController";
+    }
+    else    {
+        nibName = [NSString stringWithFormat:@"QuestionViewController%d", level];
+    }
+    
+    self = [super initWithNibName:nibName bundle:nil];
+    if (self) {
+        self.game = _game;
+        self.prevQuestions = [NSMutableArray array];
+    }
+    return self;
+}
+
+/*!
+ @method showAlertWithMessage:
+ @discussion This method shows alert
+ @param Alert message (string)
+ */
+- (void) showAlertWithMessage:(NSString *)message
+{
+    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:PROJECT_NAME message:message delegate:nil cancelButtonTitle:@"Ok" otherButtonTitles: nil];
+    [alert show];
+}
+
+/*!
+ @method randomNumberBetween:to:
+ @discussion This method generates random number between start and end parameters
+ @param starting limit (integer) ending limit
+ @return Random number (int)
+ */
+- (NSInteger) randomNumberBetween:(NSInteger)start to:(NSInteger)end
+{
+    // Get random value between 0 and 1000
+    //int number = arc4random() % 1000;
+    // Get random number between 20 and 1000
+    int number =  ((arc4random() % (end-start)) + start);
+    return number;
+}
+
+/*!
+ @method showOption1:option2:option3:option4:
+ @discussion This method displays 4 options in random sequence
+ @param 4 options (integer)
+ */
+- (void) showOption1:(NSInteger)option1 option2:(NSInteger)option2 option3:(NSInteger)option3 option4:(NSInteger)option4
+{
+    // Add options to array
+    NSMutableArray *_options = [NSMutableArray array];
+    [_options addObject:[NSString stringWithFormat:@"%d", option1]];
+    [_options addObject:[NSString stringWithFormat:@"%d", option2]];
+    [_options addObject:[NSString stringWithFormat:@"%d", option3]];
+    [_options addObject:[NSString stringWithFormat:@"%d", option4]];
+    
+    // Show options randomly
+    int index = arc4random() % 4;
+    UILabel *lblOption1 = (UILabel *)[self.view viewWithTag:11];
+    [lblOption1 setText:[_options objectAtIndex: index]];
+    [_options removeObjectAtIndex:index];
+    
+    index = arc4random() % 3;
+    UILabel *lblOption2 = (UILabel *)[self.view viewWithTag:12];
+    [lblOption2 setText:[_options objectAtIndex: index]];
+    [_options removeObjectAtIndex:index];
+    
+    index = arc4random() % 2;
+    UILabel *lblOption3 = (UILabel *)[self.view viewWithTag:13];
+    [lblOption3 setText:[_options objectAtIndex: index]];
+    [_options removeObjectAtIndex:index];
+    
+    UILabel *lblOption4 = (UILabel *)[self.view viewWithTag:14];
+    [lblOption4 setText:[_options objectAtIndex: 0]];
+}
+
+/*!
+ @method updateQuestion
+ @discussion This method updates question string adding 1 letter every time
+ */
+- (void) updateQuestion
+{
+    if( self.lblQuestion.text.length < self.question.length )   {
+        NSString *text = [self.question substringToIndex: self.lblQuestion.text.length + 1];
+        [self.lblQuestion setText: text];
+        
+        [soundPlayer stop];
+        [soundPlayer setCurrentTime:0];
+        [soundPlayer play];
+    }
+    else    {
+        [updateTimer invalidate];   updateTimer = nil;
+        
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.2];
+        [self.optionsView setAlpha:1];
+        [UIView commitAnimations];
+    }
+}
+
+/*!
+ @method setQuestionForAddition
+ @discussion This method sets addition question
+ */
+- (void) setQuestionForAddition
+{
+    int low, high, option1, option2, option3, option4;
+    int level = [[self.game objectForKey:@"level"] intValue];
+    
+    do {
+        
+        switch ( level ) {
+                
+            case EASY:      low = 1;    high = 100;     break;
+            case MEDIUM:    low = 50;   high = 500;     break;
+            case HARD:      low = 100;  high = 1000;    break;
+                
+            default:         break;
+        }
+        
+        self.operand1 = [self randomNumberBetween:low to:high];
+        self.operand2 = [self randomNumberBetween:low to:high];
+        
+        int aNumber = [self randomNumberBetween:2 to:5];
+        option1 = self.operand1 + self.operand2 + 10;
+        option2 = self.operand1 + self.operand2 + aNumber*10;
+        option3 = self.operand1 + self.operand2;
+        option4 = self.operand1 + self.operand2 - 10;
+        
+        self.question = [NSString stringWithFormat:@"%d + %d", self.operand1, self.operand2];
+        if( level == HARD )    {
+            
+            self.operand3 = [self randomNumberBetween:low to:high];
+            option1 += self.operand3;
+            option2 += self.operand3;
+            option3 += self.operand3;
+            option4 += self.operand3;
+            
+            self.question = [self.question stringByAppendingFormat:@" + %d", self.operand3];
+        }
+    
+    } while ( [self.prevQuestions containsObject:self.question] );
+    
+    [self.prevQuestions addObject:self.question];
+    
+    self.lblQuestion.text = @"";
+    updateTimer = [NSTimer scheduledTimerWithTimeInterval:0.35 target:self selector:@selector(updateQuestion) userInfo:nil repeats:YES];
+    
+    [self showOption1:option1 option2:option2 option3:option3 option4:option4];
+}
+
+/*!
+ @method setQuestionForSubtraction
+ @discussion This method sets subtraction question
+ */
+- (void) setQuestionForSubtraction
+{
+    int low, high, option1, option2, option3, option4;
+    int level = [[self.game objectForKey:@"level"] intValue];
+    
+    do {
+        switch ( level ) {
+            case EASY:      low = 1;    high = 100;     break;
+            case MEDIUM:    low = 50;   high = 500;     break;
+            case HARD:      low = 100;  high = 1000;    break;
+                
+            default:        break;
+        }
+        
+        self.operand1 = [self randomNumberBetween:low to:high];
+        self.operand2 = [self randomNumberBetween:low to:high];
+        
+        if( self.operand2 > self.operand1 )   {
+            
+            int tempNum = self.operand1;
+            self.operand1 = self.operand2;
+            self.operand2 = tempNum;
+        }
+        
+        option1 = self.operand1 - self.operand2 + 10;
+        option2 = self.operand1 - self.operand2 - 20;
+        option3 = self.operand1 - self.operand2;
+        option4 = self.operand1 - self.operand2 - 10;
+        
+        self.question = [NSString stringWithFormat:@"%d - %d", self.operand1, self.operand2];
+        if( level == HARD )    {
+            
+            self.operand3 = [self randomNumberBetween:low to:high];
+            option1 -= self.operand3;
+            option2 -= self.operand3;
+            option3 -= self.operand3;
+            option4 -= self.operand3;
+            
+            self.question = [self.question stringByAppendingFormat:@" - %d", self.operand3];
+        }
+    } while ( [self.prevQuestions containsObject:self.question] );
+    
+    [self.prevQuestions addObject:self.question];
+    
+    self.lblQuestion.text = @"";
+    updateTimer = [NSTimer scheduledTimerWithTimeInterval:0.35 target:self selector:@selector(updateQuestion) userInfo:nil repeats:YES];
+    
+    [self showOption1:option1 option2:option2 option3:option3 option4:option4];
+}
+
+/*!
+ @method setQuestionForMultiplication
+ @discussion This method sets multiplication question
+ */
+- (void) setQuestionForMultiplication
+{
+    int low, high, option1, option2, option3, option4;
+    int level = [[self.game objectForKey:@"level"] intValue];
+    
+    do {
+        switch ( level ) {
+            case EASY:      low = 1;    high = 50;      break;
+            case MEDIUM:    low = 10;   high = 100;     break;
+            case HARD:      low = 50;   high = 100;     break;
+                
+            default:        break;
+        }
+        
+        self.operand1 = [self randomNumberBetween:low to:high];
+        self.operand2 = [self randomNumberBetween:low to:high];
+        
+        option1 = self.operand1 * self.operand2 + 10;
+        option2 = self.operand1 * self.operand2;
+        
+        //NSString *opt2 = [NSString stringWithFormat:@"%d", option2];
+        //option3 = self.operand1 * self.operand2 + pow(10, [opt2 length]);
+        int aNumber = [self randomNumberBetween:3 to:5];
+        option3 = self.operand1 * self.operand2 + aNumber*10;
+        
+        option4 = self.operand1 * self.operand2 - 10;
+        if( option4 < 0 )   {
+            option4 = self.operand1 * 2;
+        }
+        
+        self.question = [NSString stringWithFormat:@"%d x %d", self.operand1, self.operand2];
+        
+    } while ( [self.prevQuestions containsObject:self.question] );
+    
+    [self.prevQuestions addObject:self.question];
+    
+    self.lblQuestion.text = @"";
+    updateTimer = [NSTimer scheduledTimerWithTimeInterval:0.35 target:self selector:@selector(updateQuestion) userInfo:nil repeats:YES];
+    
+    [self showOption1:option1 option2:option2 option3:option3 option4:option4];
+}
+
+/*!
+ @method setQuestionForDivision
+ @discussion This method sets division question
+ */
+- (void) setQuestionForDivision
+{
+    int low, high, option1, option2, option3, option4;
+    int level = [[self.game objectForKey:@"level"] intValue];
+    
+    do {
+        switch ( level ) {
+            case EASY:
+                low = 1;   high = 50;
+                self.operand2 = [self randomNumberBetween:1 to:20];
+                self.operand1 = self.operand2 * [self randomNumberBetween:low to:high];
+                break;
+                
+            case MEDIUM:
+                low = 50;   high = 100;
+                self.operand2 = [self randomNumberBetween:1 to:20];
+                self.operand1 = self.operand2 * [self randomNumberBetween:low to:high];
+                break;
+                
+            case HARD:
+                low = 50;   high = 200;
+                self.operand2 = [self randomNumberBetween:10 to:30];
+                self.operand1 = self.operand2 * [self randomNumberBetween:low to:high];
+                break;
+                
+            default:
+                break;
+        }
+        
+        if( self.operand2 > self.operand1 )   {
+            
+            int tempNum = self.operand1;
+            self.operand1 = self.operand2;
+            self.operand2 = tempNum;
+        }
+        
+        option1 = self.operand1 / self.operand2 + 1;
+        option2 = self.operand1 / self.operand2 + 2;
+        option3 = self.operand1 / self.operand2;
+        option4 = self.operand1 / self.operand2 - 1;
+        
+        self.question = [NSString stringWithFormat:@"%d ÷ %d", self.operand1, self.operand2];
+        
+    } while ( [self.prevQuestions containsObject:self.question] );
+    
+    [self.prevQuestions addObject:self.question];
+    
+    self.lblQuestion.text = @"";
+    updateTimer = [NSTimer scheduledTimerWithTimeInterval:0.35 target:self selector:@selector(updateQuestion) userInfo:nil repeats:YES];
+    
+    [self showOption1:option1 option2:option2 option3:option3 option4:option4];
+}
+
+/*!
+ @method endGame:
+ @discussion This method shows gameover screen and plays sound for an event
+ @param Event name (string)
+ */
+- (void) endGame:(NSString *)event
+{
+    [timer invalidate];     timer = nil;
+    //[[MathsWarManager sharedManager].HUD show:YES];
+    [self playSoundForEvent:event];
+    
+    //NSString *message = [NSString stringWithFormat:@"%@!\n Your score is %@", event, [self.lblScore text]];
+    //[self showScoreWithMessage:[NSString stringWithFormat:@"%@!\n Your score is %@", event, [self.lblScore text]]];
+    //message = @"GameOver";
+    [self performSelector:@selector(showScoreWithMessage:) withObject:event afterDelay:soundPlayer.duration];
+}
+
+/*!
+ @method hideTime:
+ @discussion This method hides Time
+ @param BOOL value for hiding or showing
+ */
+- (void) hideTime:(NSNumber *)hide
+{
+    [UIView beginAnimations:nil context:nil];
+    [UIView setAnimationDuration:0.2];
+    [self.timeBG setAlpha:[hide intValue]];
+    [self.lblTime setAlpha:[hide intValue]];
+    [UIView commitAnimations];
+}
+
+/*!
+ @method updateTime
+ @discussion This method updates time and blinks once
+ */
+- (void) updateTime
+{
+    //NSLog(@"updateTime");
+    self.timeInSec--;
+    int timeInMin = self.timeInSec/60;
+    [self.lblTime setText:[NSString stringWithFormat:@"%02d:%02d", timeInMin, self.timeInSec%60]];
+    
+    if( self.timeInSec == 0 )    {
+        
+        [self endGame:@"Time out"];
+    }
+    
+    [self hideTime:[NSNumber numberWithInt:0]];
+    [self performSelector:@selector(hideTime:) withObject:[NSNumber numberWithInt:1] afterDelay:0.2];
+}
+
+/*!
+ @method setStatus
+ @discussion This method sets initial values for Time, Coins, Score, Life
+ */
+- (void) setStatus
+{
+    self.questionNumber = 1;
+    [self.lblScore setText:[NSString stringWithFormat:@"%@", [self.game objectForKey:@"score"]]];
+    [self.lblCoins setText:[NSString stringWithFormat:@"%@", [self.game objectForKey:@"coins"]]];
+    [self.lblLife setText:[NSString stringWithFormat:@"%@", [self.game objectForKey:@"life"]]];
+    
+    // Set timer
+    int level = [[self.game objectForKey:@"level"] intValue];
+    switch ( level ) {
+            
+        case EASY:      self.timeInSec = 48 * TOTAL_QUESTIONS;    break;
+        case MEDIUM:    self.timeInSec = 36 * TOTAL_QUESTIONS;    break;
+        case HARD:      self.timeInSec = 24 * TOTAL_QUESTIONS;    break;
+            
+        default:        break;
+    }
+    
+    int timeInMin = self.timeInSec/60;
+    [self.lblTime setText:[NSString stringWithFormat:@"%02d:%02d", timeInMin, self.timeInSec%60]];
+    
+    if( timer != nil )  {
+        [timer invalidate]; timer = nil;
+    }
+    timer = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(updateTime) userInfo:nil repeats:YES];
+}
+
+/*!
+ @method backgroundSound
+ @discussion This method plays background sound
+ */
+- (void) playBackgroundSound
+{
+    int level = [[self.game objectForKey:@"level"] intValue];
+    NSString *filename;
+    switch ( level ) {
+            
+        case EASY:      filename = @"birdsong.mp3"; break;
+        case MEDIUM:    filename = @"storm.wav";    break;
+        case HARD:      filename = @"dark.mp3";     break;
+            
+        default:         break;
+    }
+    
+    NSString *filepath = [[NSBundle mainBundle] pathForResource:filename ofType:@""];
+    NSURL *url = [NSURL fileURLWithPath: filepath];
+	
+	NSError *error;
+	audioPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
+	audioPlayer.numberOfLoops = -1;
+	
+	if ( audioPlayer == nil )
+		NSLog(@"audioPlayer error: %@", [error description]);
+	else
+		[audioPlayer play];
+}
+
+/*!
+ @method playSoundForEvent:
+ @discussion This method plays sound for different events
+ @param Event name (string)
+ */
+- (void) playSoundForEvent:(NSString *)eventName
+{
+    [audioPlayer pause];
+    /*// pause timer
+    [timer invalidate];*/
+    [self.navigationController.view addSubview:transparentView];
+    [self.navigationController.view bringSubviewToFront:lblMessage];
+    
+    eventName = [eventName lowercaseString];
+    //NSLog(@"event: %@", eventName);
+    
+    NSString *filename;
+    if( [eventName isEqualToString:@"correct"] )    {
+        filename = @"right.mp3";
+    }
+    else if( [eventName isEqualToString:@"wrong"] )    {
+        filename = @"wrong.mp3";
+    }
+    else if( [eventName isEqualToString:@"game over"] )    {
+        filename = @"gong.wav";
+    }
+    else if( [eventName isEqualToString:@"time out"] )    {
+        filename = @"gong.wav";
+    }
+    else if( [eventName isEqualToString:@"life"] )    {
+        filename = @"submarine.aiff";
+    }
+    else if( [eventName isEqualToString:@"levelfinished"] )    {
+        filename = @"applause.mp3";
+    }
+    else if( [eventName isEqualToString:@"typing"] )    {
+        filename = @"typewriter_key.m4a";
+    }
+    
+    NSString *filepath = [[NSBundle mainBundle] pathForResource:filename ofType:@""];
+    NSURL *url = [NSURL fileURLWithPath: filepath];
+	
+	NSError *error;
+	soundPlayer = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
+	soundPlayer.delegate = self;
+    
+	if ( soundPlayer == nil )
+		NSLog(@"soundPlayer error: %@", [error description]);
+	else
+		[soundPlayer play];
+}
+
+/*!
+ @method clearPreviousSelection
+ @discussion This method will deselect previously selected option
+ */
+- (void) clearPreviousSelection
+{
+    int level = [[self.game objectForKey:@"level"] intValue];
+    NSString *strDeselectedImage = [NSString stringWithFormat:@"game%d_uncheck.png", level];
+    //NSLog(@"self.prevSelection : %d", self.prevSelection);
+    if( level == HARD ) {
+        
+        UIButton *button = (UIButton *)[self.view viewWithTag:self.prevSelection-100];
+        [button setImage:nil forState:UIControlStateNormal];
+    }
+    else    {
+        UIButton *btnPrevSelection = (UIButton*)[self.view viewWithTag:self.prevSelection];
+        //NSLog(@"btnPrevSelection: %@", btnPrevSelection);
+        UIImage *imgDeselected = [UIImage imageNamed:strDeselectedImage];
+        [btnPrevSelection setImage:imgDeselected forState:UIControlStateNormal];
+    }
+}
+
+/*!
+ @method setQuestion
+ @discussion This method will present a mathematical question
+ */
+- (void) setQuestion
+{
+    //self.failedAttempts = 0;
+    //[timer invalidate]; timer = nil;
+    [self.optionsView setAlpha:0];
+    self.lblResult.hidden = YES;
+    self.resultSmiley.hidden = YES;
+    [self playSoundForEvent:@"typing"];
+    
+    NSString *operation = (NSString *)[self.game objectForKey:@"operation"];
+    if( [operation isEqualToString:@"+"] ) {
+    
+        [self setQuestionForAddition];
+    }
+    else if( [operation isEqualToString:@"-"] ) {
+        
+        [self setQuestionForSubtraction];
+    }
+    else if( [operation isEqualToString:@"x"] ) {
+        
+        [self setQuestionForMultiplication];
+    }
+    else if( [operation isEqualToString:@"÷"] ) {
+        
+        [self setQuestionForDivision];
+    }
+    
+    if( self.prevSelection > 0 )    {
+        [self clearPreviousSelection];
+    }
+    self.prevSelection = 0;
+}
+
+/*!
+ @method incrementScoreAndCoins
+ @discussion This method increment score and coins depending on level and type of question
+ */
+- (void) incrementScoreAndCoins
+{
+    int score, coins;    
+    int level = [[self.game objectForKey:@"level"] intValue];
+    switch ( level ) {
+            
+        case EASY:      score = EASY_SCORE;  coins = 2;  break;
+        case MEDIUM:    score = MEDIUM_SCORE;  coins = 5;  break;
+        case HARD:      score = HARD_SCORE;  coins = 10; break;
+            
+        default:         break;
+    }
+    
+    NSNumber *currentQuestion = [NSNumber numberWithInt: self.questionNumber];
+    BOOL isCurrentQuestionABonusQuestion = [self.bonusQuestions containsObject:currentQuestion];
+    if( isCurrentQuestionABonusQuestion ) {
+        score *= 2;
+        coins *= 2;
+    }
+    
+    score += [[self.lblScore text] intValue];
+    coins += [[self.lblCoins text] intValue];
+    
+    [self.game setObject:[NSNumber numberWithInt:score] forKey:@"score"];
+    [self.lblScore setText:[NSString stringWithFormat:@"%d", score]];
+    
+    [self.game setObject:[NSNumber numberWithInt:coins] forKey:@"coins"];
+    [self.lblCoins setText:[NSString stringWithFormat:@"%d", coins]];
+}
+
+/*!
+ @method decrementLife
+ @discussion This method decrements life
+ */
+- (void) decrementLife
+{
+    int life = [[self.game objectForKey:@"life"] intValue];
+    life--;
+    [self.game setObject:[NSNumber numberWithInt:life] forKey:@"life"];
+    if( life == 0 ) {
+        
+        [self endGame:@"Game over"];
+        //[self.navigationController popToRootViewControllerAnimated:YES];
+        return;
+    }
+    
+    int level = [[self.game objectForKey:@"level"] intValue];
+    if( level == EASY ) {
+        [self.lblLife setText:[NSString stringWithFormat:@"%d", life]];
+    }
+    else    {
+        
+        NSString *strLostlifeImage = [NSString stringWithFormat:@"game%d_lostlife.png", level];
+        
+        switch ( life ) {
+            case 2:
+                [self.life1 setImage:[UIImage imageNamed:strLostlifeImage]];
+                break;
+                
+            case 1:
+                [self.life1 setImage:[UIImage imageNamed:strLostlifeImage]];
+                [self.life2 setImage:[UIImage imageNamed:strLostlifeImage]];
+                break;
+                
+            case 0:
+                [self.life1 setImage:[UIImage imageNamed:strLostlifeImage]];
+                [self.life2 setImage:[UIImage imageNamed:strLostlifeImage]];
+                [self.life3 setImage:[UIImage imageNamed:strLostlifeImage]];
+                break;
+                
+            default:
+                break;
+        }
+    }
+    [self showAlertWithMessage:@"You lost one life!"];
+    [self playSoundForEvent:@"life"];
+    
+    self.questionNumber++;
+    if( self.questionNumber <= TOTAL_QUESTIONS )   {
+        [self performSelector:@selector(setQuestion) withObject:nil afterDelay:1];
+    }
+    else    {
+        [timer invalidate]; timer = nil;
+        
+        [self endGame: @"game over"];
+    }
+}
+
+/*!
+ @method showScoreWithMessage:
+ @discussion This method shows score with options to share score on Facebook / Twitter
+ */
+- (void) showScoreWithMessage:(NSString*)_message
+{
+//    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Score" message:_message delegate:self cancelButtonTitle:@"Cancel" otherButtonTitles:@"Share on Facebook", @"Share on Twitter", nil];
+//    [alert show];
+    [timer invalidate];     timer = nil;
+    
+    ScoreViewController *scoreVC = [[ScoreViewController alloc] initWithGame:self.game type:_message];
+    [self.navigationController pushViewController:scoreVC animated:YES];
+}
+
+/*!
+ @method initializeTransparentView
+ @discussion This method adds transparent view on screen to ignore all the touches till sound is played
+ */
+- (void) initializeTransparentView
+{
+    if( transparentView == nil )    {
+        transparentView = [[UIView alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+        //[transparentView setBackgroundColor:[UIColor blackColor]];
+        //[transparentView setAlpha:0.85];
+        [transparentView setBackgroundColor:[UIColor clearColor]];
+    }
+    
+    //[self.navigationController.view addSubview:transparentView];
+    
+/*    //Create a couple of colours for the background gradient
+    UIColor *colorOne = [UIColor colorWithRed:0.0 green:0.125 blue:0.18 alpha:1.0];
+    UIColor *colorTwo = [UIColor colorWithRed:0.0 green:0.00 blue:0.05 alpha:1.0];
+    
+    //Create the gradient and add it to our view's root layer
+    CAGradientLayer *gradientLayer = [[CAGradientLayer alloc] init];
+    gradientLayer.frame = CGRectMake(0.0, 0.0, 320.0, 480.0);
+    [gradientLayer setColors:[NSArray arrayWithObjects:(id)colorOne.CGColor, (id)colorTwo.CGColor, nil]];
+    [self.view.layer insertSublayer:gradientLayer atIndex:0];
+    
+    //Set the label properties and glow params
+    lblMessage = [[RRSGlowLabel alloc] initWithFrame:CGRectMake(0, 0, 280, 127)];
+    lblMessage.center = self.navigationController.view.center;
+    lblMessage.textColor = [UIColor colorWithRed:0.20 green:0.70 blue:1.0 alpha:1.0];
+    lblMessage.font = [UIFont boldSystemFontOfSize:48];
+    lblMessage.textAlignment = UITextAlignmentCenter;
+    lblMessage.backgroundColor = [UIColor clearColor];
+    lblMessage.glowColor = lblMessage.textColor;
+    lblMessage.glowOffset = CGSizeMake(0.0, 0.0);
+    lblMessage.glowAmount = 7.56;
+    [self.navigationController.view addSubview:lblMessage];
+    lblMessage.hidden = YES;*/
+}
+
+/*!
+ @method initialize
+ @discussion This method initializes the screen
+ */
+- (void) initialize
+{
+    /*self.bonusQuestions = [NSMutableArray array];
+    int firstBonusQuestionIndex = [self randomNumberBetween:1 to:TOTAL_QUESTIONS];
+    int secondBonusQuestionIndex;
+    do {
+        secondBonusQuestionIndex = [self randomNumberBetween:1 to:TOTAL_QUESTIONS];
+    } while ( firstBonusQuestionIndex == secondBonusQuestionIndex );
+    [self.bonusQuestions addObject:[NSNumber numberWithInt:firstBonusQuestionIndex]];
+    [self.bonusQuestions addObject:[NSNumber numberWithInt:secondBonusQuestionIndex]];
+    //NSLog(@"self.bonusQuestions : %@", self.bonusQuestions);
+    
+    do {
+        self.pitfallQuestion = [self randomNumberBetween:1 to:TOTAL_QUESTIONS];
+    } while ( self.pitfallQuestion == firstBonusQuestionIndex || self.pitfallQuestion == secondBonusQuestionIndex);
+    //NSLog(@"self.pitfallQuestion : %d", self.pitfallQuestion);*/
+    
+    [self setStatus];
+    [self setQuestion];
+    //[self playBackgroundSound];
+}
+
+/*!
+ @method showAnswerCorrect:
+ @discussion This method shows result for a question
+ */
+- (void) showAnswerCorrect:(BOOL)_correct
+{
+    if( _correct )  {
+    
+        self.lblResult.text = @"Correct!";
+        self.lblResult.hidden = NO;
+        self.resultSmiley.image = [UIImage imageNamed:@"wink.png"];
+        self.resultSmiley.hidden = NO;
+    }
+    else    {
+        self.lblResult.text = @"Wrong!";
+        self.lblResult.hidden = NO;
+        self.resultSmiley.image = [UIImage imageNamed:@"sad.png"];
+        self.resultSmiley.hidden = NO;
+    }
+}
+
+
+/*!
+ @method appInBackground
+ @discussion This method is called when app goes in background
+ */
+- (void) appInBackground
+{
+    [DDGameKitHelper sharedGameKitHelper].shouldShowLeaderboardOnAuth = NO;
+    [self setQuestion];
+}
+
+#pragma mark - View lifecycle
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    
+    for (int i=11; i<15; i++) {
+        UILabel *lblOption = (UILabel*)[self.view viewWithTag:i];
+        [lblOption setFont:[UIFont fontWithName:@"Futura XBlk BT" size:32]];
+    }
+    
+    UIFont *font = [UIFont fontWithName:@"Futura XBlk BT" size:17];
+    [self.lblScore setFont:font];
+    [self.lblCoins setFont:font];
+    [self.lblTime setFont:font];
+    [self.lblLife setFont:font];
+    
+    int level = [[self.game objectForKey:@"level"] intValue];
+    if( level == HARD ) {
+        [self.lblTime setFont:[UIFont fontWithName:@"Let's go Digital" size:32]];
+        [self.lblTime setTextColor:[UIColor colorWithRed:(80/255.0) green:(198/255.0) blue:(230/255.0) alpha:1]];
+    }
+    [self.lblResult setFont:[UIFont fontWithName:@"DK Crayon Crumble" size:32]];
+    
+    //NSLog(@"fonts (%d) :%@",[[UIFont familyNames] count], [UIFont familyNames] );
+    
+    //[self initialize];
+    [self initializeTransparentView];
+    
+    // adjust UI for iPhone 5
+    if( is_iPhone_5 ) {
+        NSString *bgImageName = [NSString stringWithFormat:@"game%d_bg_5.png", level];
+        [self.bgImgView setImage:[UIImage imageNamed:bgImageName]];
+        
+        if( level == HARD ) {
+            [self.optionsView setFrame:CGRectMake(0, 278, 320, 190)];
+        }
+    }
+    
+    if( level == HARD ) {
+        [self.lblResult setTextColor:[UIColor whiteColor]];
+    }
+}
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [timer invalidate]; timer = nil;
+    [self initialize];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"app_background" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(appInBackground) name:@"app_background" object:nil];
+}
+
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    
+    [timer invalidate]; timer = nil;
+    [audioPlayer stop]; audioPlayer = nil;
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"app_background" object:nil];
+}
+
+- (void)didReceiveMemoryWarning
+{
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+#pragma mark- Button Action
+
+-(IBAction)home:(id)sender
+{
+    [self.navigationController popToRootViewControllerAnimated:YES];
+    
+//    NSString *message = [NSString stringWithFormat:@"Score is %@", [self.lblScore text]];
+//    [self showScoreWithMessage:message];
+}
+
+-(IBAction)optionSelected:(UIButton *)sender
+{
+    int level = [[self.game objectForKey:@"level"] intValue];
+    NSString *strSelectedImage = [NSString stringWithFormat:@"game%d_check.png", level];
+    
+    UIImage *imgSelected = [UIImage imageNamed:strSelectedImage];
+    if( level == HARD ) {
+    
+        UIButton *button = (UIButton *)[self.view viewWithTag:[sender tag]-100];
+        [button setImage:imgSelected forState:UIControlStateNormal];
+    }
+    else    {
+        [sender setImage:imgSelected forState:UIControlStateNormal];
+    }
+    
+    if( self.prevSelection > 0 )    {
+        [self clearPreviousSelection];
+    }
+
+    if( self.prevSelection == [sender tag] )    {
+        self.prevSelection = 0;
+    }
+    else    {
+        self.prevSelection = [sender tag];
+    }
+}
+
+-(IBAction)done:(id)sender
+{
+    if( self.prevSelection == 0 )   {
+    
+        [self showAlertWithMessage:@"Select an option!"];
+    }
+    else    {
+        NSInteger answer;
+        int level = [[self.game objectForKey:@"level"] intValue];
+        if( level == HARD ) {
+            
+            answer = [[(UILabel *)[self.view viewWithTag:(self.prevSelection-100+10)] text] intValue];
+        }
+        else    {
+            answer = [[(UILabel *)[self.view viewWithTag:(self.prevSelection+10)] text] intValue];
+        }
+        
+        NSString *operation = (NSString *)[self.game objectForKey:@"operation"];
+        if( ([operation isEqualToString:@"+"] &&
+             ((self.operand1 + self.operand2 + self.operand3) == answer)) ||
+           
+           ([operation isEqualToString:@"-"] &&
+            ((self.operand1 - self.operand2 - self.operand3) == answer)) ||
+           
+           ([operation isEqualToString:@"x"] && ((self.operand1 * self.operand2) == answer)) ||
+           
+           ([operation isEqualToString:@"÷"] && ((self.operand1 / self.operand2) == answer)) )
+        {
+            //NSString *message = @"Correct :)";
+            [self incrementScoreAndCoins];
+            
+            // Next Question
+            self.questionNumber++; self.correctQuestions++;
+            if( self.correctQuestions <= TOTAL_QUESTIONS )   {
+                
+                [self playSoundForEvent:@"correct"];
+//                lblMessage.text = @"Correct!";
+//                lblMessage.hidden = NO;
+                
+                [self showAnswerCorrect:YES];
+                
+                //[self showAlertWithMessage:message];
+                
+                if( self.correctQuestions == TOTAL_QUESTIONS )  {
+                    [self endGame: @"LevelFinished"];
+                }
+                else    {
+                    [self performSelector:@selector(setQuestion) withObject:nil afterDelay:1];
+                }
+            }
+            /*else    {
+                [timer invalidate]; timer = nil;
+                
+                //message = [NSString stringWithFormat:@"Level completed!\nYour score is %@",
+                //           [self.lblScore text]];
+                //message = @"LevelFinished";
+                
+                //[self showScoreWithMessage:message];
+                
+                //[self playSoundForEvent:@"applause"];
+                
+                int scorePerQuestion = 0;
+                
+                int level = [[self.game objectForKey:@"level"] intValue];
+                switch ( level ) {
+                        
+                    case EASY:      scorePerQuestion = EASY_SCORE;      break;
+                    case MEDIUM:    scorePerQuestion = MEDIUM_SCORE;    break;
+                    case HARD:      scorePerQuestion = HARD_SCORE;      break;
+                        
+                    default:         break;
+                }
+                
+                int score = scorePerQuestion * TOTAL_QUESTIONS;
+                
+                if( score  == [[self.game objectForKey:@"score"] intValue] )  {
+                    message = @"LevelFinished";
+                }
+                else    {
+                    message = @"game over";
+                }
+                
+                [self endGame: message];
+            }*/
+        }
+        else    { // wrong
+        
+            self.failedAttempts++;
+            if( self.failedAttempts == 3 ) {
+            
+                [self showAnswerCorrect:NO];
+                [self decrementLife];
+                self.failedAttempts = 0;
+            }
+            else    {
+                
+//                if( self.questionNumber == self.pitfallQuestion )   {
+//                
+//                    [self showAnswerCorrect:NO];
+//                    [self decrementLife];
+//                }
+//                else    {
+                
+                    //[self showAlertWithMessage:@"Wrong answer!"];
+                    [self playSoundForEvent:@"wrong"];
+//                    lblMessage.text = @"Wrong!";
+//                    lblMessage.hidden = NO;
+                    
+                    [self showAnswerCorrect:NO];
+                
+                self.questionNumber++;
+                if( self.questionNumber <= TOTAL_QUESTIONS )   {
+                    [self performSelector:@selector(setQuestion) withObject:nil afterDelay:1];
+                }
+                else    {
+                    [timer invalidate]; timer = nil;
+                    
+                    [self endGame: @"game over"];
+                }
+                    
+//                }
+            }
+        }
+    }
+}
+
+
+#pragma mark - Alerview delegate
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    switch ( buttonIndex ) {
+        case 1:
+            //[self shareOnFacebook];
+            break;
+            
+        case 2:
+            //[self shareOnTwitter];
+            break;
+    }
+}
+
+#pragma mark - Audio player delegate
+
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag
+{
+    lblMessage.hidden = YES;
+//    self.lblResult.hidden = YES;
+//    self.resultSmiley.hidden = YES;
+    
+    [transparentView removeFromSuperview];
+    //[soundPlayer stop]; soundPlayer.delegate = nil;  soundPlayer = nil;
+    //[audioPlayer play];
+    
+    /*// restart timer after pausing for sound play
+    if( self.navigationController.topViewController == self )   {
+        
+        if( timer != nil )  {
+            [timer invalidate]; timer = nil;
+        }
+        timer = [NSTimer scheduledTimerWithTimeInterval:1 target:self selector:@selector(updateTime) userInfo:nil repeats:YES];
+    }*/
+}
+
+@end

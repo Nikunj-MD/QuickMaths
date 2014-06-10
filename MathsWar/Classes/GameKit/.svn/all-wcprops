@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 95
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit
+END
+DDGameKitHelper.h
+K 25
+svn:wc:ra_dav:version-url
+V 113
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/DDGameKitHelper.h
+END
+DDGameKitHelperDelegate.m
+K 25
+svn:wc:ra_dav:version-url
+V 121
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/DDGameKitHelperDelegate.m
+END
+GKAchievementHandler.m
+K 25
+svn:wc:ra_dav:version-url
+V 118
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/GKAchievementHandler.m
+END
+DDGameKitHelper.m
+K 25
+svn:wc:ra_dav:version-url
+V 113
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/DDGameKitHelper.m
+END
+GKAchievementNotification.h
+K 25
+svn:wc:ra_dav:version-url
+V 123
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/GKAchievementNotification.h
+END
+DDGameKitHelperDelegate.h
+K 25
+svn:wc:ra_dav:version-url
+V 121
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/DDGameKitHelperDelegate.h
+END
+GKAchievementNotification.m
+K 25
+svn:wc:ra_dav:version-url
+V 123
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/GKAchievementNotification.m
+END
+GKAchievementHandler.h
+K 25
+svn:wc:ra_dav:version-url
+V 118
+/dotnet_svn_Clarion_Technologies/MathsWar/!svn/ver/8/branches/MathsWar/MathsWar/Classes/GameKit/GKAchievementHandler.h
+END

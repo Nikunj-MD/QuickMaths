@@ -1,0 +1,36 @@
+//
+// Prefix header for all source files of the 'MathsWar' target in the 'MathsWar' project
+//
+
+#import <Availability.h>
+
+#ifndef __IPHONE_3_0
+#warning "This project uses features only available in iOS SDK 3.0 and later."
+#endif
+
+#ifdef __OBJC__
+    #import <UIKit/UIKit.h>
+    #import <Foundation/Foundation.h>
+
+#import "MathsWarManager.h"
+#import "MBProgressHUD.h"
+#import "AppDelegate.h"
+
+
+#define APP_DELEGATE        ((AppDelegate *)[UIApplication sharedApplication].delegate)
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+#define is_iPhone_5 ([UIScreen mainScreen].bounds.size.height == 568.0)
+
+#define EASY            1
+#define MEDIUM          2
+#define HARD            3
+
+#define EASY_SCORE      2
+#define MEDIUM_SCORE    5
+#define HARD_SCORE      10
+
+#define TOTAL_QUESTIONS 25
+
+#define PROJECT_NAME    @"Quick Maths"
+
+#endif
